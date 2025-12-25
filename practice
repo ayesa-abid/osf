@@ -250,3 +250,162 @@ int main() {
     pthread_join(t2, NULL);
     return 0;
 }
+🔹 LAB 07 — Process Management System Calls
+1️⃣ Get Process ID & Parent Process ID
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    printf("PID: %d\n", getpid());
+    printf("PPID: %d\n", getppid());
+    return 0;
+}
+
+2️⃣ fork() – Parent & Child Identification
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    pid_t pid = fork();
+
+    if (pid == 0)
+        printf("Child Process\n");
+    else
+        printf("Parent Process\n");
+
+    return 0;
+}
+
+3️⃣ fork() with PID Values
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    pid_t pid = fork();
+
+    if (pid == 0)
+        printf("Child PID: %d\n", getpid());
+    else
+        printf("Parent PID: %d\n", getpid());
+
+    return 0;
+}
+
+4️⃣ Parent Waiting for Child (wait)
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main() {
+    pid_t pid = fork();
+
+    if (pid == 0)
+        printf("Child running\n");
+    else {
+        wait(NULL);
+        printf("Parent finished waiting\n");
+    }
+    return 0;
+}
+
+5️⃣ waitpid()
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main() {
+    pid_t pid = fork();
+
+    if (pid == 0)
+        printf("Child\n");
+    else {
+        waitpid(pid, NULL, 0);
+        printf("Parent after waitpid\n");
+    }
+    return 0;
+}
+
+🔹 LAB 08 — Process Management (exec + Zombie + Orphan)
+6️⃣ execvp()
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    char *args[] = {"ls", "-l", NULL};
+    execvp("ls", args);
+    return 0;
+}
+
+7️⃣ execv()
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    char *args[] = {"/bin/ls", "-l", NULL};
+    execv("/bin/ls", args);
+    return 0;
+}
+
+8️⃣ execl()
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    execl("/bin/ls", "ls", "-l", NULL);
+    return 0;
+}
+
+9️⃣ execlp()
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    execlp("ls", "ls", "-l", NULL);
+    return 0;
+}
+
+🔟 fork + exec (MOST IMPORTANT)
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    pid_t pid = fork();
+
+    if (pid == 0)
+        execlp("ls", "ls", NULL);
+    else
+        printf("Parent continues\n");
+
+    return 0;
+}
+
+1️⃣1️⃣ Zombie Process
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    pid_t pid = fork();
+
+    if (pid == 0)
+        printf("Child exits\n");
+    else {
+        sleep(20);
+        printf("Parent sleeping\n");
+    }
+    return 0;
+}
+
+1️⃣2️⃣ Orphan Process
+#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    pid_t pid = fork();
+
+    if (pid == 0) {
+        sleep(5);
+        printf("Child, new PPID: %d\n", getppid());
+    } else
+        printf("Parent exits\n");
+
+    return 0;
