@@ -1,411 +1,603 @@
-🔹 Lab 09 – Introduction to POSIX Threads (pthreads)
-1️⃣ Thread Creation & Join
+✅ Task 1: Hello World with Threads + Timing
 #include <stdio.h>
-#include <pthread.h>
-
-void* thread_func(void* arg) {
-    printf("Hello from thread\n");
-    return NULL;
-}
+#include <omp.h>
+#include <time.h>
 
 int main() {
-    pthread_t t;
-    pthread_create(&t, NULL, thread_func, NULL);
-    pthread_join(t, NULL);
-    return 0;
-}
+    clock_t start = clock();
 
-2️⃣ Global Variable Shared Between Threads
-#include <stdio.h>
-#include <pthread.h>
-
-int counter = 0;
-
-void* increment(void* arg) {
-    counter++;
-    return NULL;
-}
-
-int main() {
-    pthread_t t1, t2;
-    pthread_create(&t1, NULL, increment, NULL);
-    pthread_create(&t2, NULL, increment, NULL);
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-    printf("Counter: %d\n", counter);
-    return 0;
-}
-
-3️⃣ Local Variable in Thread
-#include <stdio.h>
-#include <pthread.h>
-
-void* func(void* arg) {
-    int x = 5;
-    printf("Local value: %d\n", x);
-    return NULL;
-}
-
-int main() {
-    pthread_t t;
-    pthread_create(&t, NULL, func, NULL);
-    pthread_join(t, NULL);
-    return 0;
-}
-
-🔹 Lab 10 – Thread Synchronization & Mutex
-4️⃣ Race Condition (Without Mutex)
-#include <stdio.h>
-#include <pthread.h>
-
-int count = 0;
-
-void* add(void* arg) {
-    for(int i = 0; i < 100000; i++)
-        count++;
-    return NULL;
-}
-
-int main() {
-    pthread_t t1, t2;
-    pthread_create(&t1, NULL, add, NULL);
-    pthread_create(&t2, NULL, add, NULL);
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-    printf("Count: %d\n", count);
-    return 0;
-}
-
-5️⃣ Mutex to Fix Race Condition
-#include <stdio.h>
-#include <pthread.h>
-
-int count = 0;
-pthread_mutex_t lock;
-
-void* add(void* arg) {
-    for(int i = 0; i < 100000; i++) {
-        pthread_mutex_lock(&lock);
-        count++;
-        pthread_mutex_unlock(&lock);
+    #pragma omp parallel
+    {
+        int id = omp_get_thread_num();
+        int total = omp_get_num_threads();
+        printf("Hello from thread %d of %d\n", id, total);
     }
-    return NULL;
-}
 
-int main() {
-    pthread_t t1, t2;
-    pthread_mutex_init(&lock, NULL);
-    pthread_create(&t1, NULL, add, NULL);
-    pthread_create(&t2, NULL, add, NULL);
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-    printf("Count: %d\n", count);
-    pthread_mutex_destroy(&lock);
+    clock_t end = clock();
+    printf("Time: %f seconds\n", (double)(end - start) / CLOCKS_PER_SEC);
     return 0;
 }
 
-🔹 Lab 11 – Thread Synchronization (Condition Variables & Barriers)
-6️⃣ Condition Variable
+
+Run:
+
+gcc task1.c -fopenmp -o task1
+export OMP_NUM_THREADS=2 && ./task1
+export OMP_NUM_THREADS=4 && ./task1
+export OMP_NUM_THREADS=8 && ./task1
+
+✅ Task 2: Array Summation WITHOUT Work-Sharing (Duplicated Work)
 #include <stdio.h>
-#include <pthread.h>
+#include <omp.h>
+#include <time.h>
 
-pthread_mutex_t lock;
-pthread_cond_t cond;
-int ready = 0;
-
-void* worker(void* arg) {
-    pthread_mutex_lock(&lock);
-    while (!ready)
-        pthread_cond_wait(&cond, &lock);
-    printf("Thread proceeding\n");
-    pthread_mutex_unlock(&lock);
-    return NULL;
-}
+#define N 100000
 
 int main() {
-    pthread_t t;
-    pthread_mutex_init(&lock, NULL);
-    pthread_cond_init(&cond, NULL);
-    pthread_create(&t, NULL, worker, NULL);
-
-    pthread_mutex_lock(&lock);
-    ready = 1;
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&lock);
-
-    pthread_join(t, NULL);
-    return 0;
-}
-
-7️⃣ Barrier Synchronization
-#include <stdio.h>
-#include <pthread.h>
-
-pthread_barrier_t barrier;
-
-void* task(void* arg) {
-    printf("Thread reached barrier\n");
-    pthread_barrier_wait(&barrier);
-    printf("Thread passed barrier\n");
-    return NULL;
-}
-
-int main() {
-    pthread_t t1, t2;
-    pthread_barrier_init(&barrier, NULL, 2);
-
-    pthread_create(&t1, NULL, task, NULL);
-    pthread_create(&t2, NULL, task, NULL);
-
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-
-    pthread_barrier_destroy(&barrier);
-    return 0;
-}
-Race condition solved using mutex
-#include <pthread.h>
-#include <stdio.h>
-
-int count = 0;
-pthread_mutex_t m;
-
-void* inc(void* arg) {
-    pthread_mutex_lock(&m);
-    count++;
-    pthread_mutex_unlock(&m);
-    return NULL;
-}
-
-int main() {
-    pthread_t t1, t2;
-    pthread_mutex_init(&m, NULL);
-
-    pthread_create(&t1, NULL, inc, NULL);
-    pthread_create(&t2, NULL, inc, NULL);
-
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-
-    printf("%d\n", count);
-    pthread_mutex_destroy(&m);
-    return 0;
-}
-
-✅ Lab 11 – Condition Variable
-Thread waits until condition is true
-#include <pthread.h>
-#include <stdio.h>
-
-pthread_mutex_t m;
-pthread_cond_t c;
-int ready = 0;
-
-void* worker(void* arg) {
-    pthread_mutex_lock(&m);
-    while (!ready)
-        pthread_cond_wait(&c, &m);
-    printf("Thread resumed\n");
-    pthread_mutex_unlock(&m);
-    return NULL;
-}
-
-int main() {
-    pthread_t t;
-    pthread_mutex_init(&m, NULL);
-    pthread_cond_init(&c, NULL);
-
-    pthread_create(&t, NULL, worker, NULL);
-
-    pthread_mutex_lock(&m);
-    ready = 1;
-    pthread_cond_signal(&c);
-    pthread_mutex_unlock(&m);
-
-    pthread_join(t, NULL);
-    return 0;
-}
-
-✅ Lab 11 – Barrier (Very common MCQ/Viva)
-#include <pthread.h>
-#include <stdio.h>
-
-pthread_barrier_t b;
-
-void* task(void* arg) {
-    printf("Before barrier\n");
-    pthread_barrier_wait(&b);
-    printf("After barrier\n");
-    return NULL;
-}
-
-int main() {
-    pthread_t t1, t2;
-    pthread_barrier_init(&b, NULL, 2);
-
-    pthread_create(&t1, NULL, task, NULL);
-    pthread_create(&t2, NULL, task, NULL);
-
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-    return 0;
-}
-🔹 LAB 07 — Process Management System Calls
-1️⃣ Get Process ID & Parent Process ID
-#include <stdio.h>
-#include <unistd.h>
-
-int main() {
-    printf("PID: %d\n", getpid());
-    printf("PPID: %d\n", getppid());
-    return 0;
-}
-
-2️⃣ fork() – Parent & Child Identification
-#include <stdio.h>
-#include <unistd.h>
-
-int main() {
-    pid_t pid = fork();
-
-    if (pid == 0)
-        printf("Child Process\n");
-    else
-        printf("Parent Process\n");
-
-    return 0;
-}
-
-3️⃣ fork() with PID Values
-#include <stdio.h>
-#include <unistd.h>
-
-int main() {
-    pid_t pid = fork();
-
-    if (pid == 0)
-        printf("Child PID: %d\n", getpid());
-    else
-        printf("Parent PID: %d\n", getpid());
-
-    return 0;
-}
-
-4️⃣ Parent Waiting for Child (wait)
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/wait.h>
-
-int main() {
-    pid_t pid = fork();
-
-    if (pid == 0)
-        printf("Child running\n");
-    else {
-        wait(NULL);
-        printf("Parent finished waiting\n");
+    int A[N], B[N], C[N];
+    for (int i = 0; i < N; i++) {
+        A[i] = i;
+        B[i] = i;
     }
-    return 0;
-}
 
-5️⃣ waitpid()
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/wait.h>
+    clock_t start = clock();
 
-int main() {
-    pid_t pid = fork();
-
-    if (pid == 0)
-        printf("Child\n");
-    else {
-        waitpid(pid, NULL, 0);
-        printf("Parent after waitpid\n");
+    #pragma omp parallel
+    {
+        for (int i = 0; i < N; i++)
+            C[i] = A[i] + B[i];
     }
+
+    clock_t end = clock();
+    printf("Time: %f seconds\n", (double)(end - start) / CLOCKS_PER_SEC);
     return 0;
 }
 
-🔹 LAB 08 — Process Management (exec + Zombie + Orphan)
-6️⃣ execvp()
+✅ Task 3: Array Summation WITH Work-Sharing (omp for)
 #include <stdio.h>
-#include <unistd.h>
+#include <omp.h>
+#include <time.h>
+
+#define N 100000
 
 int main() {
-    char *args[] = {"ls", "-l", NULL};
-    execvp("ls", args);
-    return 0;
-}
-
-7️⃣ execv()
-#include <stdio.h>
-#include <unistd.h>
-
-int main() {
-    char *args[] = {"/bin/ls", "-l", NULL};
-    execv("/bin/ls", args);
-    return 0;
-}
-
-8️⃣ execl()
-#include <stdio.h>
-#include <unistd.h>
-
-int main() {
-    execl("/bin/ls", "ls", "-l", NULL);
-    return 0;
-}
-
-9️⃣ execlp()
-#include <stdio.h>
-#include <unistd.h>
-
-int main() {
-    execlp("ls", "ls", "-l", NULL);
-    return 0;
-}
-
-🔟 fork + exec (MOST IMPORTANT)
-#include <stdio.h>
-#include <unistd.h>
-
-int main() {
-    pid_t pid = fork();
-
-    if (pid == 0)
-        execlp("ls", "ls", NULL);
-    else
-        printf("Parent continues\n");
-
-    return 0;
-}
-
-1️⃣1️⃣ Zombie Process
-#include <stdio.h>
-#include <unistd.h>
-
-int main() {
-    pid_t pid = fork();
-
-    if (pid == 0)
-        printf("Child exits\n");
-    else {
-        sleep(20);
-        printf("Parent sleeping\n");
+    int A[N], B[N], C[N];
+    for (int i = 0; i < N; i++) {
+        A[i] = i;
+        B[i] = i;
     }
+
+    clock_t seq_start = clock();
+    for (int i = 0; i < N; i++)
+        C[i] = A[i] + B[i];
+    clock_t seq_end = clock();
+
+    double par_start = omp_get_wtime();
+
+    #pragma omp parallel for
+    for (int i = 0; i < N; i++) {
+        int id = omp_get_thread_num();
+        printf("Thread %d computes index %d\n", id, i);
+        C[i] = A[i] + B[i];
+    }
+
+    double par_end = omp_get_wtime();
+
+    printf("Sequential Time: %f\n", (double)(seq_end - seq_start) / CLOCKS_PER_SEC);
+    printf("Parallel Time: %f\n", par_end - par_start);
     return 0;
 }
 
-1️⃣2️⃣ Orphan Process
+✅ Task 4: Reduction – Sum from 1 to 1,000,000
 #include <stdio.h>
-#include <unistd.h>
+#include <omp.h>
+#include <time.h>
+
+#define N 1000000
 
 int main() {
-    pid_t pid = fork();
+    long long sum = 0;
 
-    if (pid == 0) {
-        sleep(5);
-        printf("Child, new PPID: %d\n", getppid());
-    } else
-        printf("Parent exits\n");
+    clock_t s1 = clock();
+    for (int i = 1; i <= N; i++)
+        sum += i;
+    clock_t e1 = clock();
+
+    long long psum = 0;
+    double s2 = omp_get_wtime();
+
+    #pragma omp parallel for reduction(+:psum)
+    for (int i = 1; i <= N; i++)
+        psum += i;
+
+    double e2 = omp_get_wtime();
+
+    printf("Sequential Sum: %lld Time: %f\n", sum,
+           (double)(e1 - s1) / CLOCKS_PER_SEC);
+    printf("Parallel Sum: %lld Time: %f\n", psum, e2 - s2);
+    return 0;
+}
+
+✅ Task 5: Sections – Independent Work
+#include <stdio.h>
+#include <omp.h>
+#include <time.h>
+
+#define N 100000
+
+int main() {
+    int A[N], B[N], C[N];
+    for (int i = 0; i < N; i++) {
+        A[i] = i + 1;
+        B[i] = 2;
+        C[i] = i;
+    }
+
+    clock_t s1 = clock();
+    long long sum = 0, prod = 1;
+    int max = C[0];
+
+    for (int i = 0; i < N; i++) sum += A[i];
+    for (int i = 0; i < N; i++) prod *= B[i];
+    for (int i = 0; i < N; i++) if (C[i] > max) max = C[i];
+
+    clock_t e1 = clock();
+
+    double s2 = omp_get_wtime();
+
+    #pragma omp parallel sections
+    {
+        #pragma omp section
+        {
+            long long s = 0;
+            for (int i = 0; i < N; i++) s += A[i];
+            printf("Sum = %lld\n", s);
+        }
+
+        #pragma omp section
+        {
+            long long p = 1;
+            for (int i = 0; i < N; i++) p *= B[i];
+            printf("Product = %lld\n", p);
+        }
+
+        #pragma omp section
+        {
+            int m = C[0];
+            for (int i = 0; i < N; i++) if (C[i] > m) m = C[i];
+            printf("Max = %d\n", m);
+        }
+    }
+
+    double e2 = omp_get_wtime();
+
+    printf("Sequential Time: %f\n", (double)(e1 - s1) / CLOCKS_PER_SEC);
+    printf("Parallel Time: %f\n", e2 - s2);
+    return 0;
+}
+
+🔑 Compile (same for all)
+gcc filename.c -fopenmp -o filename
+
+🔑 Run with threads
+export OMP_NUM_THREADS=2
+./filename
+
+export OMP_NUM_THREADS=4
+./filename
+
+export OMP_NUM_THREADS=8
+./filename
+✅ Task 1 – Hello World with critical
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+
+    #pragma omp parallel num_threads(4)
+    {
+        int id = omp_get_thread_num();
+        int total = omp_get_num_threads();
+
+        #pragma omp critical
+        {
+            printf("Hello from thread %d of %d\n", id, total);
+        }
+    }
 
     return 0;
+}
+
+✅ Task 2 – Vector Sum with Reduction
+#include <stdio.h>
+#include <omp.h>
+
+#define N 1000000
+
+int main() {
+    int arr[N];
+    for (int i = 0; i < N; i++)
+        arr[i] = 1;
+
+    int seq_sum = 0;
+    for (int i = 0; i < N; i++)
+        seq_sum += arr[i];
+
+    int par_sum = 0;
+    #pragma omp parallel for reduction(+:par_sum)
+    for (int i = 0; i < N; i++)
+        par_sum += arr[i];
+
+    printf("Sequential Sum: %d\n", seq_sum);
+    printf("Parallel Sum: %d\n", par_sum);
+
+    return 0;
+}
+
+✅ Task 3 – Min & Max of Array
+#include <stdio.h>
+#include <omp.h>
+
+#define N 20
+
+int main() {
+    int arr[N] = {12, 5, 8, 19, 3, 7, 15, 2, 10, 6,
+                  14, 9, 1, 18, 4, 11, 13, 17, 16, 20};
+
+    int minVal = arr[0], maxVal = arr[0];
+
+    #pragma omp parallel for reduction(min:minVal) reduction(max:maxVal)
+    for (int i = 0; i < N; i++) {
+        if (arr[i] < minVal) minVal = arr[i];
+        if (arr[i] > maxVal) maxVal = arr[i];
+    }
+
+    printf("Min (Reduction): %d\n", minVal);
+    printf("Max (Reduction): %d\n", maxVal);
+
+    minVal = arr[0];
+    maxVal = arr[0];
+
+    #pragma omp parallel for
+    for (int i = 0; i < N; i++) {
+        #pragma omp critical
+        {
+            if (arr[i] < minVal) minVal = arr[i];
+            if (arr[i] > maxVal) maxVal = arr[i];
+        }
+    }
+
+    printf("Min (Critical): %d\n", minVal);
+    printf("Max (Critical): %d\n", maxVal);
+
+    return 0;
+}
+
+✅ Task 4 – Shared Counter with / without critical
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int counter = 0;
+
+    #pragma omp parallel num_threads(8)
+    {
+        counter++;
+    }
+    printf("Without critical: %d\n", counter);
+
+    counter = 0;
+
+    #pragma omp parallel num_threads(8)
+    {
+        #pragma omp critical
+        {
+            counter++;
+        }
+    }
+    printf("With critical: %d\n", counter);
+
+    return 0;
+}
+
+✅ Task 5 – Matrix Multiplication with OpenMP
+#include <stdio.h>
+#include <omp.h>
+
+#define N 200
+
+int main() {
+    static int A[N][N], B[N][N], C[N][N];
+
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++) {
+            A[i][j] = 1;
+            B[i][j] = 1;
+            C[i][j] = 0;
+        }
+
+    double start = omp_get_wtime();
+
+    #pragma omp parallel for
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            int sum = 0;
+            for (int k = 0; k < N; k++)
+                sum += A[i][k] * B[k][j];
+            C[i][j] = sum;
+        }
+    }
+
+    double end = omp_get_wtime();
+    printf("Parallel Matrix Multiplication Time: %f\n", end - start);
+
+    return 0;
+}
+
+🔑 Compile & Run
+gcc file.c -fopenmp -o file
+export OMP_NUM_THREADS=2
+./file
+export OMP_NUM_THREADS=4
+./file
+export OMP_NUM_THREADS=8
+./file
+✅ Task 1 – Private vs Shared Variable
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int x = 10;
+
+    #pragma omp parallel private(x)
+    {
+        x = 5;
+        printf("Private x in thread %d = %d\n",
+               omp_get_thread_num(), x);
+    }
+
+    printf("After private region, x = %d\n", x);
+
+    #pragma omp parallel shared(x)
+    {
+        #pragma omp atomic
+        x++;
+    }
+
+    printf("After shared region, x = %d\n", x);
+    return 0;
+}
+
+✅ Task 2 – Barrier Demonstration
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+
+    #pragma omp parallel num_threads(4)
+    {
+        int id = omp_get_thread_num();
+        printf("Thread %d reached before barrier\n", id);
+
+        #pragma omp barrier
+
+        printf("Thread %d passed barrier\n", id);
+    }
+
+    return 0;
+}
+
+✅ Task 3 – Atomic Counter
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int counter = 0;
+
+    #pragma omp parallel num_threads(16)
+    {
+        for (int i = 0; i < 100; i++)
+            counter++;
+    }
+    printf("Without atomic: %d\n", counter);
+
+    counter = 0;
+
+    #pragma omp parallel num_threads(16)
+    {
+        for (int i = 0; i < 100; i++) {
+            #pragma omp atomic
+            counter++;
+        }
+    }
+    printf("With atomic: %d\n", counter);
+
+    return 0;
+}
+
+✅ Task 4 – Master Thread Logging
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+
+    #pragma omp parallel num_threads(8)
+    {
+        #pragma omp master
+        printf("Master: Work started\n");
+
+        printf("Thread %d doing work\n",
+               omp_get_thread_num());
+
+        #pragma omp master
+        printf("Master: All work done\n");
+    }
+
+    return 0;
+}
+
+✅ Task 5 – Parallel Array Summation
+#include <stdio.h>
+#include <omp.h>
+
+#define N 100
+
+int main() {
+    int arr[N], sum = 0;
+
+    for (int i = 0; i < N; i++)
+        arr[i] = i + 1;
+
+    #pragma omp parallel for
+    for (int i = 0; i < N; i++) {
+        #pragma omp atomic
+        sum += arr[i];
+    }
+    printf("Method A (Atomic) Sum = %d\n", sum);
+
+    sum = 0;
+
+    #pragma omp parallel
+    {
+        int local_sum = 0;
+
+        #pragma omp for
+        for (int i = 0; i < N; i++)
+            local_sum += arr[i];
+
+        printf("Thread %d partial sum = %d\n",
+               omp_get_thread_num(), local_sum);
+
+        #pragma omp atomic
+        sum += local_sum;
+    }
+
+    printf("Method B (Private + Atomic) Sum = %d\n", sum);
+    return 0;
+}
+
+🔑 Compile & Run
+gcc file.c -fopenmp -o file
+export OMP_NUM_THREADS=4
+./file
+Task 1: Parallel Sorting with ordered Output
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+#define N 16
+#define SEG 4
+
+int cmp(const void* a, const void* b) {
+    return (*(int*)a - *(int*)b);
+}
+
+int main() {
+    int arr[N];
+    for (int i = 0; i < N; i++)
+        arr[i] = rand() % 100;
+
+    double start = omp_get_wtime();
+
+    #pragma omp parallel for ordered num_threads(4)
+    for (int i = 0; i < 4; i++) {
+        qsort(&arr[i * SEG], SEG, sizeof(int), cmp);
+
+        #pragma omp ordered
+        {
+            printf("Segment %d: ", i + 1);
+            for (int j = 0; j < SEG; j++)
+                printf("%d ", arr[i * SEG + j]);
+            printf("\n");
+        }
+    }
+
+    double end = omp_get_wtime();
+    printf("Time: %f\n", end - start);
+    return 0;
+}
+
+
+🔹 Remove ordered to observe random segment printing order
+
+✅ Task 2: Matrix Multiplication (with & without ordered)
+#include <stdio.h>
+#include <omp.h>
+
+#define N 4
+
+int main() {
+    int A[N][N], B[N][N], C[N][N];
+
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++) {
+            A[i][j] = 1;
+            B[i][j] = 1;
+            C[i][j] = 0;
+        }
+
+    double start1 = omp_get_wtime();
+
+    #pragma omp parallel for
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++) {
+            for (int k = 0; k < N; k++)
+                C[i][j] += A[i][k] * B[k][j];
+            printf("C[%d][%d] = %d\n", i, j, C[i][j]);
+        }
+
+    double end1 = omp_get_wtime();
+
+    double start2 = omp_get_wtime();
+
+    #pragma omp parallel for ordered
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++) {
+            int sum = 0;
+            for (int k = 0; k < N; k++)
+                sum += A[i][k] * B[k][j];
+
+            #pragma omp ordered
+            printf("Ordered C[%d][%d] = %d\n", i, j, sum);
+        }
+
+    double end2 = omp_get_wtime();
+
+    printf("Without ordered time: %f\n", end1 - start1);
+    printf("With ordered time: %f\n", end2 - start2);
+
+    return 0;
+}
+
+✅ Task 3: Squares with Ordered Output
+#include <stdio.h>
+#include <omp.h>
+
+int main() {
+
+    double start1 = omp_get_wtime();
+
+    #pragma omp parallel for
+    for (int i = 1; i <= 20; i++) {
+        int id = omp_get_thread_num();
+        printf("Thread %d computed square of %d = %d\n", id, i, i * i);
+    }
+
+    double end1 = omp_get_wtime();
+
+    double start2 = omp_get_wtime();
+
+    #pragma omp parallel for ordered
+    for (int i = 1; i <= 20; i++) {
+        int id = omp_get_thread_num();
+        #pragma omp ordered
+        printf("Thread %d computed square of %d = %d\n", id, i, i * i);
+    }
+
+    double end2 = omp_get_wtime();
+
+    printf("Without ordered time: %f\n", end1 - start1);
+    printf("With ordered time: %f\n", end2 - start2);
+
+    return 0;
+}
